@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -10,8 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_NAME = process.env.DB_NAME || 'after_school_app';
 const MONGODB_URI =
-  process.env.MONGODB_URI ||
-  'mongodb+srv://bruno:bruno25@cluster0.npw2m3k.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+  process.env.MONGODB_URI;
 
 // MIDDLEWARE
 app.use(cors());
