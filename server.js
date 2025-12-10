@@ -28,19 +28,19 @@ app.use((req, res, next) => {
 });
 
 // Static file middleware for lesson images
-const imageDir = path.join(__dirname, 'public', 'lesson-images');
+const imageDir = path.join(__dirname, 'images');
 
 app.get('/images/:filename', (req, res) => {
   const filePath = path.join(imageDir, req.params.filename);
 
   fs.access(filePath, fs.constants.F_OK, (err) => {
     if (err) {
-      res.status(404).json({ error: 'Image not found' });
-    } else {
-      res.sendFile(filePath);
+      return res.status(404).json({ error: 'Image not found' });
     }
+    res.sendFile(filePath);
   });
 });
+
 
 // MONGODB CONNECTION
 let lessonsCollection;
