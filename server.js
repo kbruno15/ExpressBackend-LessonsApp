@@ -7,33 +7,51 @@ const { MongoClient, ObjectId } = require('mongodb');
 
 const app = express();
 
-// CONFIG
+// CONFIG 
 const PORT = process.env.PORT || 3000;
 const DB_NAME = process.env.DB_NAME || 'after_school_app';
-const MONGODB_URI =
-  process.env.MONGODB_URI;
+const MONGODB_URI = process.env.MONGODB_URI;
 
-// MIDDLEWARE
+// MIDDLEWARE 
 app.use(cors());
 app.use(express.json());
 
-// Logger middleware
+/**
+ * Request logger
+ * Logs method, URL, status code and response time.
+ */
 app.use((req, res, next) => {
-  const now = new Date().toISOString();
-  console.log(`[${now}] ${req.method} ${req.url}`);
+  const start = Date.now();
+  const { method, originalUrl } = req;
+
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    const line = `[${new Date().toISOString()}] ${method} ${originalUrl} -> ${res.statusCode} (${ms}ms)`;
+    console.log(line);
+  });
+
   if (Object.keys(req.body || {}).length > 0) {
     console.log(' Body:', JSON.stringify(req.body));
   }
+
   next();
 });
 
-// Static file middleware for lesson images
+// ---------- Static file middleware for lesson images ----------
 const imageDir = path.join(__dirname, 'images');
 
-// Serve all files in /images as /images/<filename>
-app.use('/images', express.static(imageDir));
+app.get('/images/:filename', (req, res) => {
+  const filePath = path.join(imageDir, req.params.filename);
 
-// MONGODB CONNECTION
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    res.sendFile(filePath);
+  });
+});
+
+// MONGODB CONNECTION 
 let lessonsCollection;
 let ordersCollection;
 
@@ -53,11 +71,31 @@ MongoClient.connect(MONGODB_URI)
     process.exit(1);
   });
 
-// ROUTES
+// ROUTES 
 
-// Health check
+/**
+ * Root endpoint – simple status message.
+ */
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Lessons API running' });
+});
+
+/**
+ * Health check endpoint.
+ * Returns basic info and checks that the lessons collection is reachable.
+ */
+app.get('/health', async (req, res) => {
+  try {
+    const count = await lessonsCollection.estimatedDocumentCount();
+    res.json({
+      status: 'ok',
+      lessonsCount: count,
+      time: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Health check failed:', err);
+    res.status(500).json({ status: 'error', message: 'Database not reachable' });
+  }
 });
 
 // GET /lessons  (return all lessons as JSON)
@@ -167,4 +205,19 @@ app.put('/lessons/:id', (req, res) => {
       console.error(err);
       res.status(500).json({ error: 'Failed to update lesson' });
     });
+});
+
+// ERROR HANDLER
+/**
+ * Final error-handling middleware.
+ * Catches any unhandled errors and returns a standard JSON response.
+ */
+app.use((err, req, res, next) => {
+  console.error('Unhandled error for', req.method, req.url, err);
+
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  res.status(500).json({ error: 'Unexpected server error' });
 });
